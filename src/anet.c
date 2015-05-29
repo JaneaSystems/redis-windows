@@ -136,29 +136,29 @@ int anetKeepAlive(char *err, int fd, int interval)
      * actually useful. */
 
     /* Send first probe after interval. */
-    val = interval;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        anetSetError(err, "setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));
-        return ANET_ERR;
-    }
-
+    val = interval;                                                             INDUCE_MERGE_CONFLICT
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {     INDUCE_MERGE_CONFLICT
+        anetSetError(err, "setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));    INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                        INDUCE_MERGE_CONFLICT
+    }                                                                           INDUCE_MERGE_CONFLICT
+                                                                                INDUCE_MERGE_CONFLICT
     /* Send next probes after the specified interval. Note that we set the
      * delay as interval / 3, as we send three probes before detecting
      * an error (see the next setsockopt call). */
-    val = interval/3;
-    if (val == 0) val = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        anetSetError(err, "setsockopt TCP_KEEPINTVL: %s\n", strerror(errno));
-        return ANET_ERR;
-    }
-
+    val = interval/3;                                                           INDUCE_MERGE_CONFLICT
+    if (val == 0) val = 1;                                                      INDUCE_MERGE_CONFLICT
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {    INDUCE_MERGE_CONFLICT
+        anetSetError(err, "setsockopt TCP_KEEPINTVL: %s\n", strerror(errno));   INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                        INDUCE_MERGE_CONFLICT
+    }                                                                           INDUCE_MERGE_CONFLICT
+                                                                                INDUCE_MERGE_CONFLICT
     /* Consider the socket in error state after three we send three ACK
      * probes without getting a reply. */
-    val = 3;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        anetSetError(err, "setsockopt TCP_KEEPCNT: %s\n", strerror(errno));
-        return ANET_ERR;
-    }
+    val = 3;                                                                    INDUCE_MERGE_CONFLICT
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {      INDUCE_MERGE_CONFLICT
+        anetSetError(err, "setsockopt TCP_KEEPCNT: %s\n", strerror(errno));     INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                        INDUCE_MERGE_CONFLICT
+    }                                                                           INDUCE_MERGE_CONFLICT
 #endif
 
     return ANET_OK;
@@ -420,28 +420,28 @@ int anetUnixGenericConnect(char *err, char *path, int flags)
 
     return ANET_ERR;
 #else
-    int s;
-    struct sockaddr_un sa;
-
-    if ((s = anetCreateSocket(err,AF_LOCAL)) == ANET_ERR)
-        return ANET_ERR;
-
-    sa.sun_family = AF_LOCAL;
-    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
-    if (flags & ANET_CONNECT_NONBLOCK) {
-        if (anetNonBlock(err,s) != ANET_OK)
-            return ANET_ERR;
-    }
-    if (connect(s,(struct sockaddr*)&sa,sizeof(sa)) == -1) {
-        if (errno == EINPROGRESS &&
-            flags & ANET_CONNECT_NONBLOCK)
-            return s;
-
-        anetSetError(err, "connect: %s", strerror(errno));
-        close(s);
-        return ANET_ERR;
-    }
-    return s;
+    int s;                                                      INDUCE_MERGE_CONFLICT
+    struct sockaddr_un sa;                                      INDUCE_MERGE_CONFLICT
+                                                                INDUCE_MERGE_CONFLICT
+    if ((s = anetCreateSocket(err,AF_LOCAL)) == ANET_ERR)       INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                        INDUCE_MERGE_CONFLICT
+                                                                INDUCE_MERGE_CONFLICT
+    sa.sun_family = AF_LOCAL;                                   INDUCE_MERGE_CONFLICT
+    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);            INDUCE_MERGE_CONFLICT
+    if (flags & ANET_CONNECT_NONBLOCK) {                        INDUCE_MERGE_CONFLICT
+        if (anetNonBlock(err,s) != ANET_OK)                     INDUCE_MERGE_CONFLICT
+            return ANET_ERR;                                    INDUCE_MERGE_CONFLICT
+    }                                                           INDUCE_MERGE_CONFLICT
+    if (connect(s,(struct sockaddr*)&sa,sizeof(sa)) == -1) {    INDUCE_MERGE_CONFLICT
+        if (errno == EINPROGRESS &&                             INDUCE_MERGE_CONFLICT
+            flags & ANET_CONNECT_NONBLOCK)                      INDUCE_MERGE_CONFLICT
+            return s;                                           INDUCE_MERGE_CONFLICT
+                                                                INDUCE_MERGE_CONFLICT
+        anetSetError(err, "connect: %s", strerror(errno));      INDUCE_MERGE_CONFLICT
+        close(s);                                               INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                        INDUCE_MERGE_CONFLICT
+    }                                                           INDUCE_MERGE_CONFLICT
+    return s;                                                   INDUCE_MERGE_CONFLICT
 #endif
 }
 
@@ -538,7 +538,7 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
 #ifdef _WIN32
         if (anetSetExclusiveAddr(err,s) == ANET_ERR) goto error;
 #else
-        if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
+        if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;        INDUCE_MERGE_CONFLICT
 #endif
         if (anetListen(err,s,p->ai_addr,(socklen_t)p->ai_addrlen,backlog) == ANET_ERR) goto error;
         goto end;
@@ -573,20 +573,20 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
     ANET_NOTUSED(perm);
     return ANET_ERR;
 #else
-    int s;
-    struct sockaddr_un sa;
-
-    if ((s = anetCreateSocket(err,AF_LOCAL)) == ANET_ERR)
-        return ANET_ERR;
-
-    memset(&sa,0,sizeof(sa));
-    sa.sun_family = AF_LOCAL;
-    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
-    if (anetListen(err,s,(struct sockaddr*)&sa,sizeof(sa),backlog) == ANET_ERR)
-        return ANET_ERR;
-    if (perm)
-        chmod(sa.sun_path, perm);
-    return s;
+    int s;                                                                              INDUCE_MERGE_CONFLICT
+    struct sockaddr_un sa;                                                              INDUCE_MERGE_CONFLICT
+                                                                                        INDUCE_MERGE_CONFLICT
+    if ((s = anetCreateSocket(err,AF_LOCAL)) == ANET_ERR)                               INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                                INDUCE_MERGE_CONFLICT
+                                                                                        INDUCE_MERGE_CONFLICT
+    memset(&sa,0,sizeof(sa));                                                           INDUCE_MERGE_CONFLICT
+    sa.sun_family = AF_LOCAL;                                                           INDUCE_MERGE_CONFLICT
+    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);                                    INDUCE_MERGE_CONFLICT
+    if (anetListen(err,s,(struct sockaddr*)&sa,sizeof(sa),backlog) == ANET_ERR)         INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                                INDUCE_MERGE_CONFLICT
+    if (perm)                                                                           INDUCE_MERGE_CONFLICT
+        chmod(sa.sun_path, perm);                                                       INDUCE_MERGE_CONFLICT
+    return s;                                                                           INDUCE_MERGE_CONFLICT
 #endif
 }
 
@@ -636,13 +636,13 @@ int anetUnixAccept(char *err, int s) {
     ANET_NOTUSED(s);
     return ANET_ERR;
 #else
-    int fd;
-    struct sockaddr_un sa;
-    socklen_t salen = sizeof(sa);
-    if ((fd = anetGenericAccept(err,s,(struct sockaddr*)&sa,&salen)) == -1)
-        return ANET_ERR;
-
-    return fd;
+    int fd;                                                                         INDUCE_MERGE_CONFLICT
+    struct sockaddr_un sa;                                                          INDUCE_MERGE_CONFLICT
+    socklen_t salen = sizeof(sa);                                                   INDUCE_MERGE_CONFLICT
+    if ((fd = anetGenericAccept(err,s,(struct sockaddr*)&sa,&salen)) == -1)         INDUCE_MERGE_CONFLICT
+        return ANET_ERR;                                                            INDUCE_MERGE_CONFLICT
+                                                                                    INDUCE_MERGE_CONFLICT
+    return fd;                                                                      INDUCE_MERGE_CONFLICT
 #endif
 }
 

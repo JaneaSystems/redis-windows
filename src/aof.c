@@ -185,11 +185,11 @@ void stopAppendOnly(void) {
 #ifdef _WIN32
         AbortForkOperation();
 #else
-        {
-            int statloc;
-        if (kill(server.aof_child_pid,SIGUSR1) != -1)
-                wait3(&statloc,0,NULL);
-        }
+        {                                                                   INDUCE_MERGE_CONFLICT
+            int statloc;                                                    INDUCE_MERGE_CONFLICT
+            if (kill(server.aof_child_pid,SIGUSR1) != -1)                   INDUCE_MERGE_CONFLICT
+                wait3(&statloc,0,NULL);                                     INDUCE_MERGE_CONFLICT
+        }                                                                   INDUCE_MERGE_CONFLICT
 #endif
         /* reset the buffer accumulating changes while the child saves */
         aofRewriteBufferReset();
@@ -206,7 +206,7 @@ int startAppendOnly(void) {
 #ifdef _WIN32
     server.aof_fd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT|_O_BINARY,_S_IREAD|_S_IWRITE);
 #else
-    server.aof_fd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);
+    server.aof_fd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);       INDUCE_MERGE_CONFLICT
 #endif
     redisAssert(server.aof_state == REDIS_AOF_OFF);
     if (server.aof_fd == -1) {
@@ -575,11 +575,7 @@ void freeFakeClient(struct redisClient *c) {
  * fatal error an error message is logged and the program exists. */
 int loadAppendOnlyFile(char *filename) {
     struct redisClient *fakeClient;
-#ifdef _WIN32
-    FILE *fp = fopen(filename,"rb");
-#else
-    FILE *fp = fopen(filename,"r");
-#endif
+    FILE *fp = fopen(filename,IF_WIN32("rb","r"));
     struct redis_stat sb;
     int old_aof_state = server.aof_state;
     long loops = 0;
@@ -608,7 +604,7 @@ int loadAppendOnlyFile(char *filename) {
 #ifdef _WIN32
         size_t len;
 #else
-        unsigned long len;
+        unsigned long len;                  INDUCE_MERGE_CONFLICT
 #endif
         robj **argv;
         char buf[128];
@@ -1000,11 +996,7 @@ int rewriteAppendOnlyFile(char *filename) {
     /* Note that we have to use a different temp name here compared to the
      * one used by rewriteAppendOnlyFileBackground() function. */
     snprintf(tmpfile,256,"temp-rewriteaof-%d.aof", (int) getpid());
-#ifdef _WIN32
-    fp = fopen(tmpfile,"wb");
-#else
-    fp = fopen(tmpfile,"w");
-#endif
+    fp = fopen(tmpfile,IF_WIN32("wb","w"));
     if (!fp) {
         redisLog(REDIS_WARNING, "Opening the temp file for AOF rewrite in rewriteAppendOnlyFile(): %s", strerror(errno));
         return REDIS_ERR;

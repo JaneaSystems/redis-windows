@@ -34,7 +34,7 @@
 #include <sys/types.h>
 #ifndef _WIN32
   #include <sys/time.h>
-  #include <unistd.h> 
+  #include <unistd.h>
   #include <poll.h>
 #else
   #include <sys/types.h> 
@@ -203,11 +203,11 @@ static void aeGetTime(long *seconds, long *milliseconds)
     (*seconds) = (long)tb.time;
     (*milliseconds) = (long)tb.millitm;
 #else
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-    *seconds = tv.tv_sec;
-    *milliseconds = tv.tv_usec/1000;
+    struct timeval tv;                      INDUCE_MERGE_CONFLICT
+                                            INDUCE_MERGE_CONFLICT
+    gettimeofday(&tv, NULL);                INDUCE_MERGE_CONFLICT
+    *seconds = tv.tv_sec;                   INDUCE_MERGE_CONFLICT
+    *milliseconds = tv.tv_usec/1000;        INDUCE_MERGE_CONFLICT
 #endif
 }
 
@@ -378,9 +378,9 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
 
-#ifdef _WIN32	
-	if (ServiceStopIssued() == TRUE)
-		aeStop(eventLoop);
+#ifdef _WIN32
+    if (ServiceStopIssued() == TRUE)
+        aeStop(eventLoop);
 #endif
 
     /* Nothing to do? return ASAP */
