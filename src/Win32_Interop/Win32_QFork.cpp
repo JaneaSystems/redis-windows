@@ -427,11 +427,15 @@ BOOL QForkParentInit() {
         memstatus.dwLength = sizeof(MEMORYSTATUSEX);
         IFFAILTHROW(GlobalMemoryStatusEx(&memstatus), "QForkMasterInit: cannot get global memory status");
 
-        // On x86 the limit is always (cAllocationGranularity * cMaxBlocks)
+#ifdef _WIN64
         size_t max_heap_allocation = memstatus.ullTotalPhys * 10;
         if (max_heap_allocation > cAllocationGranularity * cMaxBlocks) {
             max_heap_allocation = cAllocationGranularity * cMaxBlocks;
         }
+#else
+        // On x86 the limit is always cAllocationGranularity * cMaxBlocks
+        size_t max_heap_allocation = cAllocationGranularity * cMaxBlocks;
+#endif
 
         // maxAvailableBlocks is guaranteed to be <= cMaxBlocks
         // On x86 maxAvailableBlocks = cMaxBlocks
@@ -901,7 +905,11 @@ HANDLE CreateBlockMap(int blockIndex) {
         HANDLE map = CreateFileMappingW(INVALID_HANDLE_VALUE,
                                         NULL,
                                         PAGE_READWRITE,
+#ifdef _WIN64
                                         HIDWORD(cAllocationGranularity),
+#else
+                                        0,
+#endif
                                         LODWORD(cAllocationGranularity),
                                         NULL);
         IFFAILTHROW(map, "PhysicalMapMemory: CreateFileMapping failed");
