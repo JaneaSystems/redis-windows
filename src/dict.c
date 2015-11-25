@@ -36,6 +36,7 @@
 #include "Win32_Interop/Win32_Portability.h"
 #include "Win32_Interop/Win32_Time.h"
 #include "Win32_Interop/win32fixes.h"
+extern BOOL g_IsForkedProcess;
 #endif
 
 #include "fmacros.h"
@@ -250,6 +251,9 @@ int dictExpand(dict *d,PORT_ULONG size)
  * will visit at max N*10 empty buckets in total, otherwise the amount of
  * work it does would be unbound and the function may block for a long time. */
 int dictRehash(dict *d, int n) {
+
+    WIN32_ONLY(if (g_IsForkedProcess) return 0;)
+
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
@@ -590,7 +594,7 @@ dictEntry *dictNext(dictIterator *iter)
             dictht *ht = &iter->d->ht[iter->table];
             if (iter->index == -1 && iter->table == 0) {
                 if (iter->safe)
-                    iter->d->iterators++;
+                    WIN32_ONLY(if (!g_IsForkedProcess)) iter->d->iterators++;
                 else
                     iter->fingerprint = dictFingerprint(iter->d);
             }
@@ -622,7 +626,7 @@ void dictReleaseIterator(dictIterator *iter)
 {
     if (!(iter->index == -1 && iter->table == 0)) {
         if (iter->safe)
-            iter->d->iterators--;
+            WIN32_ONLY(if (!g_IsForkedProcess)) iter->d->iterators--;
         else
             assert(iter->fingerprint == dictFingerprint(iter->d));
     }

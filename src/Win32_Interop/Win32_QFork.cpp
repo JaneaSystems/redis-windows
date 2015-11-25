@@ -97,7 +97,6 @@ allocate a system paging file that will expand up to about (3.5 * physical).
 
 #define QFORK_MAIN_IMPL
 #include "Win32_QFork.h"
-
 #include "Win32_QFork_impl.h"
 #include "Win32_SmartHandle.h"
 #include "Win32_Service.h"
@@ -212,6 +211,7 @@ struct heapBlockInfo {
 
 struct QForkControl {
     LPVOID heapStart;
+    LPVOID heapEnd;
     int maxAvailableBlocks;
     int numMappedBlocks;
     int blockSearchStart;
@@ -233,15 +233,8 @@ QForkControl* g_pQForkControl;
 HANDLE g_hQForkControlFileMap;
 HANDLE g_hForkedProcess = 0;
 int g_ChildExitCode = 0; // For child process
-BOOL g_isForkedProcess;
 BOOL g_SentinelMode;
-
-/* The system heap is used instead of the system paging file heap if
- * one of the following case is true:
- * - Redis is running as a sentinel
- * - the current instance is a forked (child) process 
- * - the persistence-available configuration flag value is 'no' */
-BOOL g_UseSystemHeap;
+BOOL g_NoPersistence;
 
 bool ReportSpecialSystemErrors(int error) {
     switch (error)
@@ -462,6 +455,7 @@ BOOL QForkParentInit() {
 
         // Need to adjust the heap start address to align on allocation granularity offset
         g_pQForkControl->heapStart = (LPVOID) (((uint64_t) pHigh + cAllocationGranularity) - ((uint64_t) pHigh % cAllocationGranularity));
+        g_pQForkControl->heapEnd = (LPVOID) ((uint64_t) g_pQForkControl->heapStart + (g_pQForkControl->maxAvailableBlocks + 1) * cAllocationGranularity);
 
         // Reserve the heap memory that will be mapped on demand in AllocHeapBlock()
         for (int i = 0; i < g_pQForkControl->maxAvailableBlocks; i++) {
@@ -508,12 +502,11 @@ StartupStatus QForkStartup() {
     HANDLE QForkControlMemoryMapHandle = NULL;
     DWORD PPID = 0;
 
-    g_isForkedProcess = FALSE;
     // TODO: consider moving the argument parsing into ParseCommandLineArguments()
 
     // Child command line looks like: --QFork [QForkControlMemoryMap handle] [parent pid]
     if (g_argMap.find(cQFork) != g_argMap.end()) {
-        g_isForkedProcess = TRUE;
+        g_IsForkedProcess = TRUE;
         char* endPtr;
         QForkControlMemoryMapHandle = (HANDLE) strtoul(g_argMap[cQFork].at(0).at(0).c_str(), &endPtr, 10);
         char* end = NULL;
@@ -529,8 +522,7 @@ StartupStatus QForkStartup() {
     }
     Globals::pageSize = perfinfo.PageSize;
 
-    if (g_isForkedProcess) {
-        g_UseSystemHeap = TRUE;
+    if (g_IsForkedProcess) {
         return QForkChildInit(QForkControlMemoryMapHandle, PPID) ? StartupStatus::ssCHILD_EXIT : StartupStatus::ssFAILED;
     } else {
         return QForkParentInit() ? StartupStatus::ssCONTINUE_AS_PARENT : StartupStatus::ssFAILED;
@@ -945,7 +937,7 @@ HANDLE CreateBlockMap(int blockIndex) {
 #ifdef USE_DLMALLOC
 /* NOTE: The allocateHigh parameter is ignored in this implementation */
 LPVOID AllocHeapBlock(size_t size, BOOL allocateHigh) {
-    if (g_UseSystemHeap) {
+    if (g_NoPersistence || g_SentinelMode || g_IsForkedProcess) {
         return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     }
 
@@ -1011,7 +1003,7 @@ LPVOID AllocHeapBlock(size_t size, BOOL allocateHigh) {
 #elif USE_JEMALLOC
 
 LPVOID AllocHeapBlock(LPVOID addr, size_t size, BOOL zero) {
-    if (g_UseSystemHeap) {
+    if (g_NoPersistence || g_SentinelMode || g_IsForkedProcess) {
         return VirtualAlloc(addr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     }
 
@@ -1078,16 +1070,31 @@ LPVOID AllocHeapBlock(LPVOID addr, size_t size, BOOL zero) {
 #endif
 
 BOOL FreeHeapBlock(LPVOID addr, size_t size) {
-    if (g_UseSystemHeap) {
-        return VirtualFree(addr, 0, MEM_RELEASE);
-    }
-
     if (size == 0) {
         return FALSE;
     }
 
-    // TODO: check addr is in heap
+    // VirtualFree is always called in sentinel mode and when
+    // persistence is off.
+    // For the forked process case we first need to check if
+    // the address is in the redis heap space or not.
+    if (g_NoPersistence || g_SentinelMode) {
+        return VirtualFree(addr, 0, MEM_RELEASE);
+    }
 
+    // Check if the address is in the redis heap
+    BOOL addressInRedisHeap = (addr >= g_pQForkControl->heapStart && addr < g_pQForkControl->heapEnd);
+
+    if (g_IsForkedProcess) {
+        if (!addressInRedisHeap) {
+            // The pages were allocated from the system heap
+            return VirtualFree(addr, 0, MEM_RELEASE);
+        } else {
+            redisLog(REDIS_DEBUG, "FreeHeapBlock: address in redis heap 0x%p", addr);
+        }
+    }
+
+    // Check the address alignment
     size_t ptrDiff = reinterpret_cast<byte*>(addr) - reinterpret_cast<byte*>(g_pQForkControl->heapStart);
     if (ptrDiff < 0 || (ptrDiff % cAllocationGranularity) != 0) {
         return FALSE;
@@ -1114,11 +1121,8 @@ BOOL FreeHeapBlock(LPVOID addr, size_t size) {
 }
 
 BOOL PurgePages(LPVOID addr, size_t length) {
-    if (g_UseSystemHeap) {
-        VirtualAlloc(addr, length, MEM_RESET, PAGE_READWRITE);
-        return TRUE;
-    }
-
+    // VirtualAlloc is called for all cases regardless the value of
+    // g_NoPersistence, g_SentinelMode and g_IsForkedProcess
     VirtualAlloc(addr, length, MEM_RESET, PAGE_READWRITE);
     return TRUE;
 }
@@ -1204,12 +1208,9 @@ extern "C"
                 return 0;
             }
 
-            BOOL persistenceAvailable = IsPersistenceAvailable();
+            g_IsForkedProcess = FALSE;
+            g_NoPersistence = !IsPersistenceAvailable();
             g_SentinelMode = checkForSentinelMode(argc, argv);
-
-            if (g_SentinelMode == TRUE || persistenceAvailable == FALSE) {
-                g_UseSystemHeap = TRUE;
-            }
 
 #ifdef USE_DLMALLOC
             DLMallocInit();
@@ -1230,7 +1231,9 @@ extern "C"
 #elif USE_JEMALLOC
             je_init();
 #endif
-            if (persistenceAvailable == TRUE && g_SentinelMode == FALSE) {
+            if (g_NoPersistence || g_SentinelMode) {
+                return redis_main(argc, argv);
+            } else {
                 StartupStatus status = QForkStartup();
                 if (status == ssCONTINUE_AS_PARENT) {
                     int retval = redis_main(argc, argv);
@@ -1247,8 +1250,6 @@ extern "C"
                     // Unexpected status return
                     return 2;
                 }
-            } else {
-                return redis_main(argc, argv);
             }
         }
         catch (system_error syserr) {
